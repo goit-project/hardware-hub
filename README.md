@@ -1,12 +1,14 @@
-# Table of Contents
-<!-- A Table of Contents should be rendered here -->
-[[_TOC_]]
+# GoIT Hardware Hub
+<!-- Continious integration status(es) -->
 
-# 1 Introduction
+## About GoIT
 TODO
 
-# 2 Getting started
+## Repository structure
 TODO
 
-# 3 Structure of the repository
+## Getting started
+TODO
+
+## Structure of the repository
 TODO
