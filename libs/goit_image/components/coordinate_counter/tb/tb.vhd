@@ -15,8 +15,10 @@ use osvvm.RandomPkg.all;
 entity tb is
   generic(
     runner_cfg : string;
-    COUNTER_MAX_VALUE_X : natural := 15;
-    COUNTER_MAX_VALUE_Y : natural := 15
+    COUNTER_MAX_VALUE_X        : natural := 15;
+    COUNTER_MAX_VALUE_Y        : natural := 15;
+    SIMULATION_CYCLES_OVERFLOW : natural := 2;
+    SIMULATION_CYCLES_VARIABLE : natural := 5
   );
 end entity;
 
@@ -63,12 +65,15 @@ begin
   process
     -- dut/simulation variables
     variable random : RandomPType;
-    variable i, dut_y, dut_x : integer := 0;
+    variable sim_cycle : integer := 0;
+    variable dut_y, dut_x : integer := 0;
     variable dut_counter_max_y, dut_counter_max_x : integer := 0;
 
 
     procedure dut_cycle_reset is
     begin
+      dut_x := 0;
+      dut_y := 0;
       arst_n <= '0';
       wait until falling_edge(clk);
       arst_n <= '1';
@@ -77,10 +82,10 @@ begin
 
     procedure dut_configure(max_x, max_y : in natural) is
     begin
-      i_counter_max_x   <= to_unsigned(max_x, i_counter_max_x'length);
-      i_counter_max_y   <= to_unsigned(max_y, i_counter_max_y'length);
       dut_counter_max_x := max_x;
       dut_counter_max_y := max_y;
+      i_counter_max_x   <= to_unsigned(max_x, i_counter_max_x'length);
+      i_counter_max_y   <= to_unsigned(max_y, i_counter_max_y'length);
     end procedure;
 
 
@@ -112,7 +117,7 @@ begin
         en <= '1';
 
         -- wait couple of counter iterations
-        for i in 0 to COUNTER_MAX_VALUE_X+3 loop
+        for sim_cycle in 0 to COUNTER_MAX_VALUE_X+3 loop
           wait until rising_edge(clk);
         end loop;
 
@@ -133,9 +138,9 @@ begin
         en <= '1';
 
         -- simulate two full cycles of X and Y counter overflow
-        while (i < 2) loop
+        while (sim_cycle < SIMULATION_CYCLES_OVERFLOW) loop
           en <= random.RandSl;
-		  wait for CLK_PERIOD*0.1;
+          wait for CLK_PERIOD*0.1;
 
           -- compare DUT and model
           check(o_counter_y = dut_y, "Y counter value check ("
@@ -153,13 +158,47 @@ begin
           -- next clock cycle + simulation finalization check
           wait until falling_edge(clk);
           if dut_x = dut_counter_max_x and dut_y = dut_counter_max_y then
-             i := i + 1;
+             sim_cycle := sim_cycle + 1;
           end if;
         end loop;
 
 
       elsif run("counter_full_variable") then
-        error("Test not implemented");
+        -- prepare counter
+        dut_configure(
+          random.RandInt(2,COUNTER_MAX_VALUE_X),
+          random.RandInt(2,COUNTER_MAX_VALUE_Y));
+        dut_cycle_reset;
+
+        -- simulate two full cycles of X and Y counter overflow
+        while (sim_cycle < SIMULATION_CYCLES_VARIABLE) loop
+          en <= random.RandSl;
+          wait for CLK_PERIOD*0.1;
+
+          -- compare DUT and model
+          check(o_counter_y = dut_y, "Y counter value check ("
+            & "EXPECTED: " & integer'image(dut_y) & "; "
+            & "GOT: " & integer'image(to_integer(o_counter_y))
+            & ")");
+          check(o_counter_x = dut_x, "X counter value check ("
+            & "EXPECTED: " & integer'image(dut_x) & "; "
+            & "GOT: " & integer'image(to_integer(o_counter_x))
+            & ")");
+
+          -- update DUT for the next iteration
+          dut_model_update;
+
+          -- next clock cycle + simulation finalization check
+          wait until falling_edge(clk);
+          if dut_x = dut_counter_max_x and dut_y = dut_counter_max_y then
+             sim_cycle := sim_cycle + 1;
+            dut_configure(
+              random.RandInt(2,COUNTER_MAX_VALUE_X),
+              random.RandInt(2,COUNTER_MAX_VALUE_Y)
+            );
+            dut_cycle_reset;
+          end if;
+        end loop;
 
       end if;
 
