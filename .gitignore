@@ -1,0 +1,12 @@
+# swap files
+**.swp
+
+# Simulation folder
+**/sim/*
+!**/sim/*.vhd
+!**/sim/*.v
+!**/sim/*.py
+!**/sim/*.do
+
+# Python
+**__pycache__
